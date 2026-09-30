@@ -1,3 +1,4 @@
+from routers.ml import router as ml_router
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from routers.sales import router as sales_router
@@ -12,6 +13,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.include_router(ml_router)
 app.include_router(sales_router)
 app.include_router(customers_router)
 app.include_router(inventory_router)

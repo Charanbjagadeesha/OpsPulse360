@@ -13,3 +13,6 @@ __pycache__/
 .env
 
 processed_events.jsonl
+
+anomalies.csv
+sales_forecast.csv
