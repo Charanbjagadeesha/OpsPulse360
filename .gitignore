@@ -16,3 +16,5 @@ processed_events.jsonl
 
 anomalies.csv
 sales_forecast.csv
+
+alerts.json
