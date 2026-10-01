@@ -55,7 +55,9 @@ def generate_event(event_number):
 
 print("OpsPulse 360 event generator started...")
 
-for i in range(1, 21):
+i = 1
+
+while True:
     event = generate_event(i)
 
     producer.send("orders", value=event)
@@ -63,6 +65,5 @@ for i in range(1, 21):
 
     print("Sent:", event)
 
+    i += 1
     time.sleep(1)
-
-print("Event generation completed.")

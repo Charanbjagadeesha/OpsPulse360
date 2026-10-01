@@ -1,0 +1,1413 @@
+import { useEffect, useState } from "react";
+
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  Package,
+  Truck,
+  Megaphone,
+  DollarSign,
+  BarChart3,
+  Activity,
+  Brain,
+  Bell,
+  Search,
+  UserCircle,
+  TrendingUp,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
+
+import "./App.css";
+
+const API = "http://127.0.0.1:8000";
+
+function App() {
+  const [activeMenu, setActiveMenu] = useState("Overview");
+  const [data, setData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const menuItems = [
+    { icon: LayoutDashboard, label: "Overview" },
+    { icon: ShoppingCart, label: "Sales" },
+    { icon: Users, label: "Customers" },
+    { icon: Package, label: "Inventory" },
+    { icon: Truck, label: "Delivery" },
+    { icon: Megaphone, label: "Marketing" },
+    { icon: Activity, label: "Live Events" },
+    { icon: Brain, label: "Intelligence" },
+    { icon: Bell, label: "Alerts" },
+  ];
+
+  async function getJSON(endpoint) {
+    const response = await fetch(`${API}${endpoint}`);
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    // Normalize API responses that return arrays
+    if (endpoint === "/api/inventory/stockout-risk") {
+      const rows = Array.isArray(result) ? result : [];
+      const high = rows.find((r) => r.stockout_risk === "HIGH");
+      const low = rows.find((r) => r.stockout_risk === "LOW");
+
+      return {
+        high_risk: high?.product_count ?? 0,
+        low_risk: low?.product_count ?? 0,
+      };
+    }
+
+    if (endpoint === "/api/inventory/turnover") {
+      const row = Array.isArray(result) ? result[0] : result;
+      return {
+        inventory_turnover: row?.inventory_turnover ?? 0,
+      };
+    }
+
+    if (endpoint === "/api/inventory/days") {
+      const row = Array.isArray(result) ? result[0] : result;
+      return {
+        days_of_inventory: row?.days_of_inventory ?? 0,
+      };
+    }
+
+    if (endpoint === "/api/delivery/ontime") {
+      const row = Array.isArray(result) ? result[0] : result;
+      return {
+        on_time_pct: row?.on_time_pct ?? 0,
+        on_time: row?.on_time ?? 0,
+        total_deliveries: row?.total_deliveries ?? row?.total ?? 0,
+      };
+    }
+
+    if (endpoint === "/api/delivery/average-time") {
+      const row = Array.isArray(result) ? result[0] : result;
+      return {
+        avg_delivery_time_hours: row?.avg_delivery_time_hours ?? 0,
+      };
+    }
+
+    if (endpoint === "/api/delivery/sla-breach") {
+      const row = Array.isArray(result) ? result[0] : result;
+      return {
+        sla_breach_pct: row?.sla_breach_pct ?? 0,
+        sla_breach_deliveries: row?.sla_breach_deliveries ?? 0,
+      };
+    }
+
+    return result;
+  }
+
+  async function loadPageData(page, showLoading = true) {
+    if (showLoading) {
+      setLoading(true);
+      setError("");
+    }
+
+    try {
+      if (page === "Overview") {
+        const [
+          revenue,
+          orders,
+          aov,
+          margin,
+          stockout,
+          delivery,
+          anomalies,
+        ] = await Promise.all([
+          getJSON("/api/sales/revenue"),
+          getJSON("/api/sales/orders"),
+          getJSON("/api/sales/aov"),
+          getJSON("/api/sales/margin"),
+          getJSON("/api/inventory/stockout-risk"),
+          getJSON("/api/delivery/sla-breach"),
+          getJSON("/api/ml/anomalies"),
+        ]);
+
+        setData({
+          revenue,
+          orders,
+          aov,
+          margin,
+          stockout,
+          delivery,
+          anomalies,
+        });
+      }
+
+      if (page === "Sales") {
+        const [
+          revenue,
+          orders,
+          aov,
+          units,
+          margin,
+          growth,
+        ] = await Promise.all([
+          getJSON("/api/sales/revenue"),
+          getJSON("/api/sales/orders"),
+          getJSON("/api/sales/aov"),
+          getJSON("/api/sales/units"),
+          getJSON("/api/sales/margin"),
+          getJSON("/api/sales/growth"),
+        ]);
+
+        setData({
+          revenue,
+          orders,
+          aov,
+          units,
+          margin,
+          growth,
+        });
+      }
+
+      if (page === "Customers") {
+        const [
+          newCustomers,
+          repeatRate,
+          retention,
+          segments,
+        ] = await Promise.all([
+          getJSON("/api/customers/new"),
+          getJSON("/api/customers/repeat-rate"),
+          getJSON("/api/customers/retention"),
+          getJSON("/api/customers/segments"),
+        ]);
+
+        setData({
+          newCustomers,
+          repeatRate,
+          retention,
+          segments,
+        });
+      }
+
+      if (page === "Inventory") {
+        const [
+          stockout,
+          turnover,
+          days,
+          reorder,
+        ] = await Promise.all([
+          getJSON("/api/inventory/stockout-risk"),
+          getJSON("/api/inventory/turnover"),
+          getJSON("/api/inventory/days"),
+          getJSON("/api/inventory/reorder"),
+        ]);
+
+        setData({
+          stockout,
+          turnover,
+          days,
+          reorder,
+        });
+      }
+
+      if (page === "Delivery") {
+        const [
+          ontime,
+          average,
+          breach,
+          partners,
+        ] = await Promise.all([
+          getJSON("/api/delivery/ontime"),
+          getJSON("/api/delivery/average-time"),
+          getJSON("/api/delivery/sla-breach"),
+          getJSON("/api/delivery/partners"),
+        ]);
+
+        setData({
+          ontime,
+          average,
+          breach,
+          partners,
+        });
+      }
+
+      if (page === "Live Events") {
+        const events = await getJSON("/api/stream/events");
+
+        setData({ events });
+      }
+
+      if (page === "Intelligence") {
+        const [
+          anomalies,
+          forecast,
+        ] = await Promise.all([
+          getJSON("/api/ml/anomalies"),
+          getJSON("/api/ml/forecast"),
+        ]);
+
+        setData({
+          anomalies,
+          forecast,
+        });
+      }
+
+      if (page === "Alerts") {
+        const alerts = await getJSON("/api/alerts");
+
+        setData({ alerts });
+      }
+
+      if (page === "Marketing") {
+        const [ctr, conversion, cac, campaignRoi, roas] = await Promise.all([
+          getJSON("/api/marketing/ctr"),
+          getJSON("/api/marketing/conversion-rate"),
+          getJSON("/api/marketing/cac"),
+          getJSON("/api/marketing/campaign-roi"),
+          getJSON("/api/marketing/roas"),
+        ]);
+
+        setData({
+          ctr,
+          conversion,
+          cac,
+          campaignRoi,
+          roas,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+
+      if (showLoading) {
+        setError(
+          "Unable to load this section. Please check that FastAPI is running."
+        );
+      }
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }
+
+useEffect(() => {
+  // Show loading only when entering a page
+  loadPageData(activeMenu, true);
+
+  // Refresh data silently in the background
+  const interval = setInterval(() => {
+    loadPageData(activeMenu, false);
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [activeMenu]);
+
+
+  const money = (value) => {
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
+      return "₹0";
+    }
+
+    return `₹${n.toLocaleString("en-IN", {
+      maximumFractionDigits: 0,
+    })}`;
+  };
+
+  const num = (value) => {
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
+      return "0";
+    }
+
+    return n.toLocaleString("en-IN");
+  };
+
+  const pct = (value) => {
+    const n = Number(value);
+
+    if (!Number.isFinite(n)) {
+      return "0.00%";
+    }
+
+    return `${n.toFixed(2)}%`;
+  };
+
+  const metric = (title, value, subtitle, Icon) => (
+    <div className="kpi-card" key={title}>
+      <div className="kpi-top">
+        <span>{title}</span>
+
+        <div className="kpi-icon">
+          <Icon size={18} />
+        </div>
+      </div>
+
+      <h3>{value}</h3>
+
+      <div className="kpi-bottom">
+        <span className="kpi-change">{subtitle}</span>
+      </div>
+    </div>
+  );
+
+  const PageHeader = ({ title, subtitle }) => (
+    <section className="welcome-section">
+      <div>
+        <p className="eyebrow">OPS PULSE 360</p>
+
+        <h2>{title}</h2>
+
+        <p className="welcome-text">{subtitle}</p>
+      </div>
+
+      <div className="live-badge">
+        <span className="live-dot"></span>
+        Live Data
+      </div>
+    </section>
+  );
+
+  const DataTable = ({ title, columns, rows }) => (
+    <div className="panel-card table-card">
+      <div className="panel-header">
+        <div>
+          <p className="panel-label">ANALYTICS</p>
+          <h3>{title}</h3>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="empty-state">
+          No data available.
+        </div>
+      ) : (
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                {columns.map((column) => (
+                  <th key={column}>{column}</th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={index}>
+                  {row.map((value, cellIndex) => (
+                    <td key={cellIndex}>{value}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderOverview = () => (
+    <>
+      <PageHeader
+        title="Executive Overview"
+        subtitle="Monitor the health of your retail business from one centralized analytics panel."
+      />
+
+      <section className="kpi-grid">
+        {metric(
+          "Revenue",
+          money(data.revenue?.value),
+          "Completed revenue",
+          TrendingUp
+        )}
+
+        {metric(
+          "Orders",
+          num(data.orders?.value),
+          "Completed orders",
+          ShoppingCart
+        )}
+
+        {metric(
+          "Average Order Value",
+          money(data.aov?.value),
+          "Revenue per order",
+          Package
+        )}
+
+        {metric(
+          "Margin",
+          money(data.margin?.value),
+          "Gross margin",
+          TrendingUp
+        )}
+      </section>
+
+      <section className="main-grid">
+        <div className="panel-card">
+          <div className="panel-header">
+            <div>
+              <p className="panel-label">BUSINESS PERFORMANCE</p>
+              <h3>Revenue Snapshot</h3>
+            </div>
+          </div>
+
+          <div className="big-number">
+            {money(data.revenue?.value)}
+          </div>
+
+          <p className="muted">
+            Completed revenue recorded in the analytical warehouse.
+          </p>
+
+          <div className="overview-bar">
+            <div></div>
+          </div>
+        </div>
+
+        <div className="panel-card">
+          <div className="panel-header">
+            <div>
+              <p className="panel-label">OPERATIONAL HEALTH</p>
+              <h3>Risk Indicators</h3>
+            </div>
+
+            <Activity size={19} />
+          </div>
+
+          <div className="health-list">
+            <div className="health-row">
+              <div>
+                <strong>Inventory Risk</strong>
+                <small>High stockout risk</small>
+              </div>
+
+              <span className="health-value danger">
+                {num(data.stockout?.high_risk)}
+              </span>
+            </div>
+
+            <div className="health-row">
+              <div>
+                <strong>Delivery SLA</strong>
+                <small>Current breach rate</small>
+              </div>
+
+              <span className="health-value danger">
+                {pct(data.delivery?.sla_breach_pct)}
+              </span>
+            </div>
+
+            <div className="health-row">
+              <div>
+                <strong>Revenue Anomalies</strong>
+                <small>ML detected</small>
+              </div>
+
+              <span className="health-value warning">
+                {num(data.anomalies?.anomaly_count)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderSales = () => (
+    <>
+      <PageHeader
+        title="Sales Analytics"
+        subtitle="Track revenue, orders, units, average order value and margin."
+      />
+
+      <section className="kpi-grid">
+        {metric(
+          "Revenue",
+          money(data.revenue?.value),
+          "Completed revenue",
+          TrendingUp
+        )}
+
+        {metric(
+          "Orders",
+          num(data.orders?.value),
+          "Total orders",
+          ShoppingCart
+        )}
+
+        {metric(
+          "Average Order Value",
+          money(data.aov?.value),
+          "Revenue per order",
+          Package
+        )}
+
+        {metric(
+          "Margin",
+          money(data.margin?.value),
+          "Gross margin",
+          TrendingUp
+        )}
+      </section>
+
+      <section className="main-grid">
+        <div className="panel-card">
+          <div className="panel-header">
+            <div>
+              <p className="panel-label">SALES VOLUME</p>
+              <h3>Units Sold</h3>
+            </div>
+          </div>
+
+          <div className="big-number">
+            {num(data.units?.value)}
+          </div>
+
+          <p className="muted">
+            Completed units across all orders.
+          </p>
+        </div>
+
+        <div className="panel-card">
+          <div className="panel-header">
+            <div>
+              <p className="panel-label">REVENUE GROWTH</p>
+              <h3>Latest Growth</h3>
+            </div>
+          </div>
+
+          <div className="big-number">
+            {pct(data.growth?.growth_pct)}
+          </div>
+
+          <p className="muted">
+            Latest available revenue growth measurement.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderCustomers = () => (
+    <>
+      <PageHeader
+        title="Customer Analytics"
+        subtitle="Understand acquisition, repeat purchasing and customer segments."
+      />
+
+      <section className="kpi-grid">
+        {metric(
+          "New Customers",
+          num(data.newCustomers?.value),
+          "First completed order",
+          Users
+        )}
+
+        {metric(
+          "Repeat Rate",
+          pct(data.repeatRate?.repeat_rate_pct),
+          "Customers returning",
+          Users
+        )}
+
+        {metric(
+          "Active Customers",
+          num(data.repeatRate?.active_customers),
+          "Customers with orders",
+          UserCircle
+        )}
+      </section>
+
+      <DataTable
+        title="Customer Segment Performance"
+        columns={[
+          "Segment",
+          "Customers",
+          "Orders",
+          "Revenue",
+        ]}
+        rows={(data.segments || []).map((row) => [
+          row.segment,
+          num(row.customers),
+          num(row.orders),
+          money(row.revenue),
+        ])}
+      />
+    </>
+  );
+
+  const renderInventory = () => (
+    <>
+      <PageHeader
+        title="Inventory Analytics"
+        subtitle="Monitor stockout risk, turnover, inventory days and replenishment."
+      />
+
+      <section className="kpi-grid">
+        {metric(
+          "High Stockout Risk",
+          num(data.stockout?.high_risk),
+          "Products requiring attention",
+          AlertTriangle
+        )}
+
+        {metric(
+          "Inventory Turnover",
+          Number(
+            data.turnover?.inventory_turnover || 0
+          ).toFixed(2),
+          "Turnover ratio",
+          Package
+        )}
+
+        {metric(
+          "Days of Inventory",
+          Number(
+            data.days?.days_of_inventory || 0
+          ).toFixed(0),
+          "Estimated days",
+          Package
+        )}
+      </section>
+
+      <DataTable
+        title="Reorder Requirements"
+        columns={[
+          "Warehouse",
+          "Product",
+          "Available",
+          "Reorder Level",
+          "Reorder Qty",
+        ]}
+        rows={(data.reorder || [])
+          .slice(0, 15)
+          .map((row) => [
+            row.warehouse_id,
+            row.product_id,
+            num(row.available_qty),
+            num(row.reorder_level),
+            num(row.reorder_qty),
+          ])}
+      />
+    </>
+  );
+
+  const renderDelivery = () => (
+    <>
+      <PageHeader
+        title="Delivery Analytics"
+        subtitle="Monitor on-time performance, delivery speed and SLA compliance."
+      />
+
+      <section className="kpi-grid">
+        {metric(
+          "On-Time Delivery",
+          pct(data.ontime?.on_time_pct),
+          `${num(data.ontime?.on_time)} on time`,
+          Truck
+        )}
+
+        {metric(
+          "Average Delivery",
+          `${Number(
+            (Array.isArray(data.average)
+              ? data.average[0]?.avg_delivery_time_hours
+              : data.average?.avg_delivery_time_hours) ?? 0
+          ).toFixed(1)} hrs`,
+          "Average delivery time",
+          Truck
+        )}
+
+        {metric(
+          "SLA Breach",
+          pct(data.breach?.sla_breach_pct),
+          `${num(data.breach?.sla_breach_deliveries)} breached`,
+          AlertTriangle
+        )}
+      </section>
+
+      <DataTable
+        title="Delivery Partner Performance"
+        columns={[
+          "Partner",
+          "Deliveries",
+          "On-Time %",
+          "SLA Breach %",
+        ]}
+        rows={(data.partners || []).map((row) => [
+          row.partner,
+          num(row.total_deliveries),
+          pct(row.on_time_pct),
+          pct(row.sla_breach_pct),
+        ])}
+      />
+    </>
+  );
+
+  const renderMarketing = () => {
+    const ctrRows = Array.isArray(data.ctr) ? data.ctr : [];
+    const conversionRows = Array.isArray(data.conversion) ? data.conversion : [];
+    const cacRows = Array.isArray(data.cac) ? data.cac : [];
+    const roiRows = Array.isArray(data.campaignRoi) ? data.campaignRoi : [];
+    const roas = data.roas?.[0] || {};
+
+    return (
+      <>
+        <PageHeader
+          title="Marketing Analytics"
+          subtitle="Campaign performance and marketing KPI monitoring."
+        />
+
+        <div className="metric-grid">
+          {metric(
+            "ROAS",
+            Number(roas.roas || 0).toFixed(2),
+            "Return on ad spend",
+            Megaphone
+          )}
+
+          {metric(
+            "Marketing Spend",
+            money(roas.total_spend),
+            "Total campaign spend",
+            DollarSign
+          )}
+
+          {metric(
+            "Revenue",
+            money(roas.total_revenue),
+            "Revenue used for ROAS",
+            TrendingUp
+          )}
+
+          {metric(
+            "Campaigns",
+            num(ctrRows.length),
+            "Campaign records",
+            BarChart3
+          )}
+        </div>
+
+        <DataTable
+          title="Campaign CTR"
+          columns={[
+            "Campaign",
+            "Channel",
+            "Impressions",
+            "Clicks",
+            "CTR",
+          ]}
+          rows={ctrRows.slice(0, 15).map((row) => [
+            row.campaign_id,
+            row.channel,
+            num(row.impressions),
+            num(row.clicks),
+            pct(row.ctr_pct),
+          ])}
+        />
+
+        <DataTable
+          title="Campaign Conversion Rate"
+          columns={[
+            "Campaign",
+            "Conversion Rate",
+          ]}
+          rows={conversionRows.slice(0, 15).map((row) => [
+            row.campaign_id,
+            pct(row.conversion_rate_pct ?? row.conversion_rate),
+          ])}
+        />
+
+        <DataTable
+          title="Campaign CAC"
+          columns={[
+            "Campaign",
+            "CAC",
+          ]}
+          rows={cacRows.slice(0, 15).map((row) => [
+            row.campaign_id,
+            money(row.cac),
+          ])}
+        />
+
+        <DataTable
+          title="Campaign ROI"
+          columns={[
+            "Campaign",
+            "ROI",
+          ]}
+          rows={roiRows.slice(0, 15).map((row) => [
+            row.campaign_id,
+            pct(row.roi_pct ?? row.roi),
+          ])}
+        />
+      </>
+    );
+  };
+
+  const renderLiveEvents = () => {
+  const events = Array.isArray(data.events)
+    ? data.events
+    : data.events?.events || [];
+
+  const recentEvents = events.slice(-20);
+
+  const amounts = recentEvents.map((row) => {
+    const value = Number(row.amount);
+    return Number.isFinite(value) ? value : 0;
+  });
+
+  const maxAmount = Math.max(...amounts, 1);
+  const totalAmount = amounts.reduce((sum, value) => sum + value, 0);
+
+  const chartWidth = 760;
+  const chartHeight = 240;
+
+  const points = amounts.map((value, index) => {
+    const x =
+      recentEvents.length <= 1
+        ? chartWidth / 2
+        : (index / (recentEvents.length - 1)) * chartWidth;
+
+    const y = chartHeight - (value / maxAmount) * 190 - 20;
+
+    return `${x},${y}`;
+  }).join(" ");
+
+  const latestEvent = recentEvents[recentEvents.length - 1] || {};
+
+  return (
+    <>
+      <PageHeader
+        title="Live Event Monitoring"
+        subtitle="Monitor incoming order, payment, delivery and inventory events."
+      />
+
+      <div className="live-status-card">
+        <span className="live-dot"></span>
+
+        <div>
+          <strong>Streaming Pipeline Active</strong>
+          <p>
+            Kafka events are available through the backend API.
+          </p>
+        </div>
+
+        <RefreshCw size={19} />
+      </div>
+
+      <div className="metric-grid">
+        {metric(
+          "Live Events",
+          num(events.length),
+          "Events received by the API",
+          Activity
+        )}
+
+        {metric(
+          "Recent Events",
+          num(recentEvents.length),
+          "Latest events in the stream",
+          RefreshCw
+        )}
+
+        {metric(
+          "Live Amount",
+          money(totalAmount),
+          "Amount across recent events",
+          DollarSign
+        )}
+
+        {metric(
+          "Latest Type",
+          latestEvent.event_type || "-",
+          "Most recent event",
+          Activity
+        )}
+      </div>
+
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "18px",
+          padding: "24px",
+          marginTop: "24px",
+          border: "1px solid #e5e7eb",
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "18px",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0 }}>Live Event Amount Trend</h3>
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#64748b",
+                fontSize: "14px",
+              }}
+            >
+              Latest stream events — refreshes automatically every 5 seconds
+            </p>
+          </div>
+
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              padding: "7px 12px",
+              borderRadius: "999px",
+              background: "#ecfdf5",
+              color: "#047857",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            <span className="live-dot"></span>
+            LIVE
+          </span>
+        </div>
+
+        <div style={{ width: "100%", overflowX: "auto" }}>
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            width="100%"
+            height="260"
+            preserveAspectRatio="none"
+          >
+            {[0, 1, 2, 3, 4].map((line) => {
+              const y = 20 + (line * 190) / 4;
+
+              return (
+                <line
+                  key={line}
+                  x1="0"
+                  y1={y}
+                  x2={chartWidth}
+                  y2={y}
+                  stroke="#e2e8f0"
+                  strokeWidth="1"
+                />
+              );
+            })}
+
+            {points && (
+              <>
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {amounts.map((value, index) => {
+                  const x =
+                    recentEvents.length <= 1
+                      ? chartWidth / 2
+                      : (index / (recentEvents.length - 1)) * chartWidth;
+
+                  const y =
+                    chartHeight - (value / maxAmount) * 190 - 20;
+
+                  return (
+                    <circle
+                      key={index}
+                      cx={x}
+                      cy={y}
+                      r="5"
+                      fill="#ffffff"
+                      stroke="#2563eb"
+                      strokeWidth="3"
+                    />
+                  );
+                })}
+              </>
+            )}
+          </svg>
+        </div>
+      </div>
+
+      <DataTable
+        title="Recent Events"
+        columns={[
+          "Event Type",
+          "Order",
+          "Product",
+          "Amount",
+          "Status",
+        ]}
+        rows={events
+          .slice(-15)
+          .reverse()
+          .map((row) => [
+            row.event_type || "-",
+            row.order_id || "-",
+            row.product_id || "-",
+            row.amount ? money(row.amount) : "-",
+            row.payment_status ||
+              row.delivery_status ||
+              row.stock_status ||
+              "-",
+          ])}
+      />
+    </>
+  );
+};
+
+  const renderAlerts = () => {
+    const alerts =
+      data.alerts?.alerts || [];
+
+    return (
+      <>
+        <PageHeader
+          title="Alert Center"
+          subtitle="Automated operational alerts generated by OpsPulse 360."
+        />
+
+        <div className="alert-grid">
+          {alerts.map((alert, index) => (
+            <div className="alert-card" key={index}>
+              <div className="alert-card-icon">
+                <AlertTriangle size={20} />
+              </div>
+
+              <div>
+                <span className="alert-severity">
+                  {alert.severity || "HIGH"}
+                </span>
+
+                <h3>
+                  {alert.type || "Business Alert"}
+                </h3>
+
+                <p>{alert.message}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {alerts.length === 0 && (
+          <div className="empty-state">
+            No active alerts.
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderIntelligence = () => {
+    const anomalies = data.anomalies?.anomalies || [];
+    const anomalyCount = data.anomalies?.anomaly_count || 0;
+    const forecastRows = Array.isArray(data.forecast)
+      ? data.forecast
+      : data.forecast?.forecast || [];
+
+    return (
+      <>
+        <div className="section-header">
+          <div>
+            <h1>Intelligence</h1>
+            <p>AI-powered anomaly detection and demand forecasting.</p>
+          </div>
+        </div>
+
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <span className="kpi-label">Anomalies Detected</span>
+            <strong className="kpi-value">{anomalyCount}</strong>
+            <span className="kpi-subtitle">Detected by ML</span>
+          </div>
+
+          <div className="kpi-card">
+            <span className="kpi-label">Forecast Records</span>
+            <strong className="kpi-value">{forecastRows.length}</strong>
+            <span className="kpi-subtitle">Forecast horizon</span>
+          </div>
+        </div>
+
+        <div className="chart-panel">
+          <div className="section-header">
+            <div>
+              <h2>Detected Anomalies</h2>
+              <p>Revenue observations identified as anomalous.</p>
+            </div>
+          </div>
+
+          {anomalies.length > 0 ? (
+            <div className="data-table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Revenue</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {anomalies.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.date_id}</td>
+                      <td>{Number(item.revenue || 0).toLocaleString()}</td>
+                      <td>{item.status || "ANOMALY"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <h3>No anomalies detected</h3>
+              <p>The ML model did not return any anomaly records.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="chart-panel">
+          <div className="section-header">
+            <div>
+              <h2>Demand Forecast</h2>
+              <p>Forecast results returned by the ML service.</p>
+            </div>
+          </div>
+
+          {forecastRows.length > 0 ? (
+            <div className="data-table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {Object.keys(forecastRows[0]).map((key) => (
+                      <th key={key}>{key.replaceAll("_", " ")}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecastRows.map((row, index) => (
+                    <tr key={index}>
+                      {Object.keys(forecastRows[0]).map((key) => (
+                        <td key={key}>
+                          {typeof row[key] === "number"
+                            ? Number(row[key]).toLocaleString()
+                            : String(row[key] ?? "")}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <h3>No forecast data</h3>
+              <p>The ML forecast service did not return any records.</p>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
+
+  const renderPage = () => {
+    if (loading && Object.keys(data).length === 0) {
+  return (
+    <div className="loading-state">
+      <RefreshCw size={28} className="spin" />
+
+      <h3>
+        Loading {activeMenu}...
+      </h3>
+
+      <p>
+        Fetching analytics from FastAPI.
+      </p>
+    </div>
+  );
+}
+
+    if (error) {
+      return (
+        <div className="error-state">
+          <AlertTriangle size={30} />
+
+          <h3>Unable to load data</h3>
+
+          <p>{error}</p>
+
+          <button
+            className="retry-button"
+            onClick={() =>
+              loadPageData(activeMenu)
+            }
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    switch (activeMenu) {
+      case "Overview":
+        return renderOverview();
+
+      case "Sales":
+        return renderSales();
+
+      case "Customers":
+        return renderCustomers();
+
+      case "Inventory":
+        return renderInventory();
+
+      case "Delivery":
+        return renderDelivery();
+
+      case "Marketing":
+        return renderMarketing();
+
+      case "Live Events":
+        return renderLiveEvents();
+
+      case "Intelligence":
+        return renderIntelligence();
+
+      case "Alerts":
+        return renderAlerts();
+
+      default:
+        return renderOverview();
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+
+        <div className="brand">
+          <div className="brand-mark">
+            O
+          </div>
+
+          <div>
+            <h1>OpsPulse</h1>
+            <span>360 ANALYTICS</span>
+          </div>
+        </div>
+
+        <div className="system-status">
+          <span className="status-dot"></span>
+          Systems Online
+        </div>
+
+        <div className="menu-title">
+          BUSINESS PANEL
+        </div>
+
+        <nav>
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <div
+                key={item.label}
+                className={`menu-item ${
+                  activeMenu === item.label
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setActiveMenu(item.label)
+                }
+              >
+                <Icon size={19} />
+
+                <span>
+                  {item.label}
+                </span>
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div className="sidebar-user">
+            <UserCircle size={30} />
+
+            <div>
+              <strong>
+                Executive User
+              </strong>
+
+              <span>
+                Administrator
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+      <main className="main-content">
+
+        <header className="topbar">
+
+          <div>
+            <span className="topbar-label">
+              RETAIL ANALYTICS
+            </span>
+
+            <h1>{activeMenu}</h1>
+          </div>
+
+          <div className="topbar-actions">
+
+            <div className="search-box">
+              <Search size={17} />
+
+              <input
+                type="text"
+                placeholder="Search..."
+              />
+            </div>
+
+            <button className="icon-button">
+              <Bell size={19} />
+            </button>
+
+            <div className="user-profile">
+              <UserCircle size={32} />
+
+              <div>
+                <strong>
+                  Executive
+                </strong>
+
+                <span>
+                  Admin
+                </span>
+              </div>
+            </div>
+
+          </div>
+
+        </header>
+
+        <div className="content-area">
+          {renderPage()}
+        </div>
+
+      </main>
+    </div>
+  );
+}
+
+export default App;

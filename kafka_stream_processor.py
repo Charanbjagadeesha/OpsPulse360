@@ -7,7 +7,7 @@ consumer = KafkaConsumer(
     "orders",
     bootstrap_servers="localhost:9092",
     auto_offset_reset="earliest",
-    group_id="opspulse360-multi-event-processor",
+    group_id="opspulse360-live-processor",
     value_deserializer=lambda value: json.loads(value.decode("utf-8"))
 )
 
