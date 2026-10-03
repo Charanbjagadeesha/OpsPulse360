@@ -7,7 +7,7 @@ router = APIRouter(
     tags=["Streaming"]
 )
 
-EVENT_FILE = Path("/mnt/c/OpsPulse360/processed_events.jsonl")
+EVENT_FILE = Path("/app/processed_events.jsonl")
 
 
 @router.get("/events")
