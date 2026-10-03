@@ -1,32 +1,43 @@
 from fastapi import APIRouter
-import json
-from pathlib import Path
+from google.cloud import bigquery
 
 router = APIRouter(
     prefix="/api/stream",
     tags=["Streaming"]
 )
 
-EVENT_FILE = Path("/app/processed_events.jsonl")
+PROJECT_ID = "psyched-myth-354703"
+
+client = bigquery.Client(project=PROJECT_ID)
 
 
 @router.get("/events")
 def get_stream_events():
+
+    query = """
+    SELECT
+        order_id,
+        customer_id,
+        product_id,
+        amount,
+        amount_category
+    FROM `psyched-myth-354703.opspulse360.stream_orders`
+    ORDER BY order_id DESC
+    LIMIT 100
+    """
+
+    rows = client.query(query).result()
+
     events = []
 
-    if not EVENT_FILE.exists():
-        return events
+    for row in rows:
+        events.append({
+            "event_type": "order",
+            "order_id": row.order_id,
+            "customer_id": row.customer_id,
+            "product_id": row.product_id,
+            "amount": row.amount,
+            "amount_category": row.amount_category
+        })
 
-    with EVENT_FILE.open("r", encoding="utf-8") as file:
-        for line in file:
-            line = line.strip()
-
-            if not line:
-                continue
-
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    return events[-100:]
+    return events
