@@ -1,3 +1,4 @@
+import pandas as pd
 from fastapi import APIRouter
 from google.cloud import bigquery
 from sklearn.ensemble import IsolationForest, RandomForestRegressor
