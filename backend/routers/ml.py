@@ -4,7 +4,7 @@ from pathlib import Path
 
 router = APIRouter(prefix="/api/ml", tags=["Machine Learning"])
 
-PROJECT_DIR = Path("/mnt/c/OpsPulse360")
+PROJECT_DIR = Path("/app")
 
 
 @router.get("/anomalies")
