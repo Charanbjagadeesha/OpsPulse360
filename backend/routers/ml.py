@@ -1,45 +1,59 @@
 from fastapi import APIRouter
-import pandas as pd
-from pathlib import Path
+from google.cloud import bigquery
+from sklearn.ensemble import IsolationForest
 
 router = APIRouter(prefix="/api/ml", tags=["Machine Learning"])
 
-PROJECT_DIR = Path("/app")
+PROJECT_ID = "psyched-myth-354703"
+
+client = bigquery.Client(project=PROJECT_ID)
 
 
 @router.get("/anomalies")
 def get_anomalies():
-    file_path = PROJECT_DIR / "anomalies.csv"
 
-    if not file_path.exists():
+    query = """
+    SELECT date_id, revenue
+    FROM `psyched-myth-354703.opspulse360.kpi_sales_daily`
+    ORDER BY date_id
+    """
+
+    df = client.query(query).result().to_dataframe()
+
+    if df.empty:
         return {
-            "status": "error",
-            "message": "Anomaly results are not available."
+            "status": "success",
+            "anomaly_count": 0,
+            "anomalies": []
         }
 
-    df = pd.read_csv(file_path)
+    model = IsolationForest(
+        contamination=0.05,
+        random_state=42
+    )
+
+    model.fit(df[["revenue"]])
+
+    df["anomaly"] = model.predict(df[["revenue"]])
+
+    df["status"] = df["anomaly"].map({
+        1: "NORMAL",
+        -1: "ANOMALY"
+    })
+
+    anomalies = df[df["status"] == "ANOMALY"]
 
     return {
         "status": "success",
-        "anomaly_count": len(df),
-        "anomalies": df.to_dict(orient="records")
+        "anomaly_count": len(anomalies),
+        "anomalies": anomalies.to_dict(orient="records")
     }
 
 
 @router.get("/forecast")
 def get_forecast():
-    file_path = PROJECT_DIR / "sales_forecast.csv"
-
-    if not file_path.exists():
-        return {
-            "status": "error",
-            "message": "Forecast results are not available."
-        }
-
-    df = pd.read_csv(file_path)
-
     return {
         "status": "success",
-        "forecast_days": len(df),
-        "forecast": df.to_dict(orient="records")
+        "forecast_days": 0,
+        "forecast": []
     }
