@@ -21,7 +21,7 @@ import {
 
 import "./App.css";
 
-const API = "http://127.0.0.1:8000";
+const API = "https://opspulse360-9271x.onrender.com";
 
 function App() {
   const [activeMenu, setActiveMenu] = useState("Overview");
